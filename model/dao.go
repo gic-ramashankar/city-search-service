@@ -1,6 +1,8 @@
 package model
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
+import (
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type CityData struct {
 	ID            primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
@@ -15,6 +17,13 @@ type CityData struct {
 	City          string             `bson:"city, omitempty" json:"city,omitempty"`
 	Country       string             `bson:"country, omitempty" json:"country,omitempty"`
 	PinCode       int64              `bson:"pinCode, omitempty" json:"pinCode,omitempty"`
+	UpdatedBy     string             `bson:"updated_by, omitempty" json:"updated_by,omitempty"`
+	CategoriesId  primitive.ObjectID `bson:"categories_id,omitempty" json:"categories_id,omitempty"`
+}
+
+type Categories struct {
+	ID       primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	Category string             `bson:"category, omitempty" json:"category,omitempty"`
 }
 
 type Search struct {
