@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"city/model"
 	"city/service"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const tokenIdForAdmin = "admin000000122343456"
@@ -107,10 +109,13 @@ func searchByCity(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusBadRequest, "Invalid request")
 	}
 
-	if searchData, err := mongoDetails.SearchData(searchBoth); err != nil {
+	if searchData, fileName, err := mongoDetails.SearchData(searchBoth); err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
 	} else {
-		respondWithJson(w, http.StatusAccepted, searchData)
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", "attachment; filename="+fileName+".xlsx")
+		w.Header().Set("Content-Transfer-Encoding", "binary")
+		http.ServeContent(w, r, "Workbook.xlxs", time.Now(), bytes.NewReader(searchData))
 	}
 }
 

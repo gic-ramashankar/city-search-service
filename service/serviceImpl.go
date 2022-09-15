@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"time"
@@ -87,31 +88,36 @@ func (e *Connection) DeleteData(cityData string) (string, error) {
 	return "Deleted Successfully", nil
 }
 
-func (e *Connection) SearchData(searchBoth model.SearchBoth) ([]*model.CityData, error) {
+func (e *Connection) SearchData(searchBoth model.SearchBoth) ([]byte, string, error) {
 	var data []*model.CityData
 	var cursor *mongo.Cursor
 	var err error
+	var dataty []byte
+	os.MkdirAll("data/download", os.ModePerm)
+	dir := "data/download/"
+	file := "searchResult" + fmt.Sprintf("%v", time.Now().Format("3_4_5_pm"))
+	csvFile, err := os.Create(dir + file + ".csv")
 	str := "please provide value of either city or category"
 
 	if searchBoth.City != "" {
 		cursor, err = Collection.Find(ctx, bson.D{primitive.E{Key: "city", Value: searchBoth.City}})
 
 		if err != nil {
-			return data, err
+			return dataty, file, err
 		}
 		str = "No data present in db for given city name"
 	} else if searchBoth.Category != "" {
 		categoryData, error := e.SearchDataInCategories(searchBoth.Category)
 
 		if error != nil {
-			return data, err
+			return dataty, file, err
 		}
 
 		id := categoryData[0].ID
 		cursor, err = Collection.Find(ctx, bson.D{primitive.E{Key: "categories_id", Value: id}})
 
 		if err != nil {
-			return data, err
+			return dataty, file, err
 		}
 		str = "No data present in city data db for given category"
 	}
@@ -120,17 +126,14 @@ func (e *Connection) SearchData(searchBoth model.SearchBoth) ([]*model.CityData,
 		var e model.CityData
 		err := cursor.Decode(&e)
 		if err != nil {
-			return data, err
+			return dataty, file, err
 		}
 		data = append(data, &e)
 	}
 
 	if data == nil {
-		return data, errors.New(str)
+		return dataty, file, errors.New(str)
 	}
-	os.MkdirAll("data/download", os.ModePerm)
-	file := "data/download/searchResult" + fmt.Sprintf("%v", time.Now().Format("3_4_5_pm")) + ".csv"
-	csvFile, err := os.Create(file)
 
 	if err != nil {
 		fmt.Println(err)
@@ -140,7 +143,7 @@ func (e *Connection) SearchData(searchBoth model.SearchBoth) ([]*model.CityData,
 
 	header := []string{"ID", "Title", "Name", "Address", "Latitude", "Longitude", "Website", "ContactNumber", "User", "City", "Country", "PinCode", "UpdatedBy", "CategoriesId"}
 	if err := writer.Write(header); err != nil {
-		return data, err
+		return dataty, file, err
 	}
 
 	for _, r := range data {
@@ -148,13 +151,19 @@ func (e *Connection) SearchData(searchBoth model.SearchBoth) ([]*model.CityData,
 		csvRow = append(csvRow, fmt.Sprintf("%v", r.ID), r.Title, r.Name, r.Address, fmt.Sprintf("%f", r.Latitude), fmt.Sprintf("%f", r.Longitude), r.Website, fmt.Sprintf("%v", r.ContactNumber),
 			r.User, r.City, r.Country, fmt.Sprintf("%v", r.PinCode), r.UpdatedBy, fmt.Sprintf("%v", r.CategoriesId))
 		if err := writer.Write(csvRow); err != nil {
-			return data, err
+			return dataty, file, err
 		}
 	}
 
 	// remember to flush!
 	writer.Flush()
-	return data, nil
+
+	dataty, err = ioutil.ReadFile(dir + file + ".csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return dataty, file, nil
 }
 
 func (e *Connection) SearchDataByKeyAndValue(reqBody model.Search) ([]*model.CityData, error) {
