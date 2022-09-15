@@ -30,3 +30,8 @@ type Search struct {
 	Key   string `bson:"key,omitempty" json:"key,omitempty"`
 	Value string `bson:"value,omitempty" json:"value,omitempty"`
 }
+
+type SearchBoth struct {
+	City     string `bson:"city,omitempty" json:"city,omitempty"`
+	Category string `bson:"category,omitempty" json:"category,omitempty"`
+}

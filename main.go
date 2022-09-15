@@ -101,15 +101,13 @@ func searchByCity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var reqBody map[string]string
+	var searchBoth model.SearchBoth
 
-	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&searchBoth); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request")
 	}
 
-	name := reqBody["city"]
-
-	if searchData, err := mongoDetails.SearchData(name); err != nil {
+	if searchData, err := mongoDetails.SearchData(searchBoth); err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
 	} else {
 		respondWithJson(w, http.StatusAccepted, searchData)
@@ -298,29 +296,6 @@ func updateDataInCategory(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func searchBothTable(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-
-	if r.Method != "GET" {
-		respondWithError(w, http.StatusBadRequest, "Invalid method")
-		return
-	}
-
-	var reqBody map[string]string
-
-	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid request")
-	}
-
-	name := reqBody["category"]
-
-	if searchData, err := mongoDetails.SearchUsingBothTables(name); err != nil {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
-	} else {
-		respondWithJson(w, http.StatusAccepted, searchData)
-	}
-}
-
 func respondWithJson(w http.ResponseWriter, code int, payload interface{}) {
 	response, _ := json.Marshal(payload)
 	w.Header().Set("Content-Type", "application/json")
@@ -336,13 +311,12 @@ func main() {
 	http.HandleFunc("/add-data/", addData)
 	http.HandleFunc("/delete-data", deleteData)
 	http.HandleFunc("/update-data/", updateData)
-	http.HandleFunc("/search-by-city", searchByCity)
+	http.HandleFunc("/search-by-city-category", searchByCity)
 	http.HandleFunc("/search", search)
 	http.HandleFunc("/add-data-category", addDataInCategory)
 	http.HandleFunc("/delete-data-category", deleteDataInCategory)
 	http.HandleFunc("/search-by-category", searchByCategory)
 	http.HandleFunc("/update-data-category/", updateDataInCategory)
-	http.HandleFunc("/search-both-table/", searchBothTable)
 	fmt.Println("Service Started at 8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

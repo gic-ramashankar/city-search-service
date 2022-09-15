@@ -83,13 +83,33 @@ func (e *Connection) DeleteData(cityData string) (string, error) {
 	return "Deleted Successfully", nil
 }
 
-func (e *Connection) SearchData(cityName string) ([]*model.CityData, error) {
+func (e *Connection) SearchData(searchBoth model.SearchBoth) ([]*model.CityData, error) {
 	var data []*model.CityData
+	var cursor *mongo.Cursor
+	var err error
+	str := "please provide value of either city or category"
 
-	cursor, err := Collection.Find(ctx, bson.D{primitive.E{Key: "city", Value: cityName}})
+	if searchBoth.City != "" {
+		cursor, err = Collection.Find(ctx, bson.D{primitive.E{Key: "city", Value: searchBoth.City}})
 
-	if err != nil {
-		return data, err
+		if err != nil {
+			return data, err
+		}
+		str = "No data present in db for given city name"
+	} else if searchBoth.Category != "" {
+		categoryData, error := e.SearchDataInCategories(searchBoth.Category)
+
+		if error != nil {
+			return data, err
+		}
+
+		id := categoryData[0].ID
+		cursor, err = Collection.Find(ctx, bson.D{primitive.E{Key: "categories_id", Value: id}})
+
+		if err != nil {
+			return data, err
+		}
+		str = "No data present in city data db for given category"
 	}
 
 	for cursor.Next(ctx) {
@@ -102,7 +122,7 @@ func (e *Connection) SearchData(cityName string) ([]*model.CityData, error) {
 	}
 
 	if data == nil {
-		return data, errors.New("No data present in db for given city name")
+		return data, errors.New(str)
 	}
 	return data, nil
 }
@@ -229,35 +249,4 @@ func (e *Connection) UpdateDataInCategories(cityData model.Categories, field str
 		return "", err2
 	}
 	return "Data Updated Successfully", nil
-}
-
-func (e *Connection) SearchUsingBothTables(field string) ([]*model.CityData, error) {
-	var finalData []*model.CityData
-
-	data, err := e.SearchDataInCategories(field)
-	if err != nil {
-		return finalData, err
-	}
-
-	id := data[0].ID
-	cursor, err := Collection.Find(ctx, bson.D{primitive.E{Key: "categories_id", Value: id}})
-
-	if err != nil {
-		return finalData, err
-	}
-
-	for cursor.Next(ctx) {
-		var e model.CityData
-		err := cursor.Decode(&e)
-		if err != nil {
-			return finalData, err
-		}
-		finalData = append(finalData, &e)
-	}
-
-	if finalData == nil {
-		return finalData, errors.New("No data present in city data db for given category")
-	}
-	return finalData, nil
-
 }
