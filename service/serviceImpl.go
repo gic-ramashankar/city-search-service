@@ -3,8 +3,12 @@ package service
 import (
 	"city/model"
 	"context"
+	"encoding/csv"
 	"errors"
+	"fmt"
 	"log"
+	"os"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -124,6 +128,32 @@ func (e *Connection) SearchData(searchBoth model.SearchBoth) ([]*model.CityData,
 	if data == nil {
 		return data, errors.New(str)
 	}
+	os.MkdirAll("data/download", os.ModePerm)
+	file := "data/download/searchResult" + fmt.Sprintf("%v", time.Now().Format("3_4_5_pm")) + ".csv"
+	csvFile, err := os.Create(file)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer csvFile.Close()
+	writer := csv.NewWriter(csvFile)
+
+	header := []string{"ID", "Title", "Name", "Address", "Latitude", "Longitude", "Website", "ContactNumber", "User", "City", "Country", "PinCode", "UpdatedBy", "CategoriesId"}
+	if err := writer.Write(header); err != nil {
+		return data, err
+	}
+
+	for _, r := range data {
+		var csvRow []string
+		csvRow = append(csvRow, fmt.Sprintf("%v", r.ID), r.Title, r.Name, r.Address, fmt.Sprintf("%f", r.Latitude), fmt.Sprintf("%f", r.Longitude), r.Website, fmt.Sprintf("%v", r.ContactNumber),
+			r.User, r.City, r.Country, fmt.Sprintf("%v", r.PinCode), r.UpdatedBy, fmt.Sprintf("%v", r.CategoriesId))
+		if err := writer.Write(csvRow); err != nil {
+			return data, err
+		}
+	}
+
+	// remember to flush!
+	writer.Flush()
 	return data, nil
 }
 
