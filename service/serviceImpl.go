@@ -98,8 +98,21 @@ func (e *Connection) SearchData(searchBoth model.SearchBoth) ([]byte, string, er
 	file := "searchResult" + fmt.Sprintf("%v", time.Now().Format("3_4_5_pm"))
 	csvFile, err := os.Create(dir + file + ".csv")
 	str := "please provide value of either city or category"
+	if (searchBoth.City != "") && (searchBoth.Category != "") {
+		categoryData, error := e.SearchDataInCategories(searchBoth.Category)
 
-	if searchBoth.City != "" {
+		if error != nil {
+			return dataty, file, err
+		}
+
+		id := categoryData[0].ID
+		cursor, err = Collection.Find(ctx, bson.D{primitive.E{Key: "categories_id", Value: id}, primitive.E{Key: "city", Value: searchBoth.City}})
+
+		if err != nil {
+			return dataty, file, err
+		}
+		str = "No data present in city data db for given category or city"
+	} else if searchBoth.City != "" {
 		cursor, err = Collection.Find(ctx, bson.D{primitive.E{Key: "city", Value: searchBoth.City}})
 
 		if err != nil {
