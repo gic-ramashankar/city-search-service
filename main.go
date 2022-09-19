@@ -103,13 +103,17 @@ func searchByCity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	path := r.URL.Path
+	segments := strings.Split(path, "/")
+	option := segments[len(segments)-1]
+
 	var searchBoth model.SearchBoth
 
 	if err := json.NewDecoder(r.Body).Decode(&searchBoth); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request")
 	}
 
-	if searchData, fileName, err := mongoDetails.SearchData(searchBoth); err != nil {
+	if searchData, fileName, err := mongoDetails.SearchData(searchBoth, option); err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
 	} else {
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -316,7 +320,7 @@ func main() {
 	http.HandleFunc("/add-data/", addData)
 	http.HandleFunc("/delete-data", deleteData)
 	http.HandleFunc("/update-data/", updateData)
-	http.HandleFunc("/search-by-city-category", searchByCity)
+	http.HandleFunc("/search-by-city-category/", searchByCity)
 	http.HandleFunc("/search", search)
 	http.HandleFunc("/add-data-category", addDataInCategory)
 	http.HandleFunc("/delete-data-category", deleteDataInCategory)

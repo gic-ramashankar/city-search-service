@@ -3,7 +3,6 @@ package service
 import (
 	"city/model"
 	"context"
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/signintech/gopdf"
+	"github.com/xuri/excelize/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -88,16 +89,21 @@ func (e *Connection) DeleteData(cityData string) (string, error) {
 	return "Deleted Successfully", nil
 }
 
-func (e *Connection) SearchData(searchBoth model.SearchBoth) ([]byte, string, error) {
+func (e *Connection) SearchData(searchBoth model.SearchBoth, option string) ([]byte, string, error) {
 	var data []*model.CityData
 	var cursor *mongo.Cursor
 	var err error
 	var dataty []byte
+	str := "please provide value of either city or category"
+
 	os.MkdirAll("data/download", os.ModePerm)
 	dir := "data/download/"
 	file := "searchResult" + fmt.Sprintf("%v", time.Now().Format("3_4_5_pm"))
-	csvFile, err := os.Create(dir + file + ".csv")
-	str := "please provide value of either city or category"
+	//	xlsFile, err := os.Create(dir + file + ".xls")
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	if (searchBoth.City != "") && (searchBoth.Category != "") {
 		categoryData, error := e.SearchDataInCategories(searchBoth.Category)
 
@@ -148,34 +154,29 @@ func (e *Connection) SearchData(searchBoth model.SearchBoth) ([]byte, string, er
 		return dataty, file, errors.New(str)
 	}
 
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer csvFile.Close()
-	writer := csv.NewWriter(csvFile)
-
-	header := []string{"ID", "Title", "Name", "Address", "Latitude", "Longitude", "Website", "ContactNumber", "User", "City", "Country", "PinCode", "UpdatedBy", "CategoriesId"}
-	if err := writer.Write(header); err != nil {
-		return dataty, file, err
-	}
-
-	for _, r := range data {
-		var csvRow []string
-		csvRow = append(csvRow, fmt.Sprintf("%v", r.ID), r.Title, r.Name, r.Address, fmt.Sprintf("%f", r.Latitude), fmt.Sprintf("%f", r.Longitude), r.Website, fmt.Sprintf("%v", r.ContactNumber),
-			r.User, r.City, r.Country, fmt.Sprintf("%v", r.PinCode), r.UpdatedBy, fmt.Sprintf("%v", r.CategoriesId))
-		if err := writer.Write(csvRow); err != nil {
+	if option == "Excel" {
+		log.Println("Excel")
+		errExcel := writeDataIntoExcel(dir, file, data)
+		if errExcel != nil {
+			return dataty, file, err
+		}
+		dataty, err = ioutil.ReadFile(dir + file + ".xlsx")
+		if err != nil {
 			return dataty, file, err
 		}
 	}
 
-	// remember to flush!
-	writer.Flush()
-
-	dataty, err = ioutil.ReadFile(dir + file + ".csv")
-	if err != nil {
-		log.Fatal(err)
+	if option == "Pdf" {
+		log.Println("Pdf")
+		errExcel := writeDataIntoPdf(dir, file, data)
+		if errExcel != nil {
+			return dataty, file, err
+		}
+		// dataty, err = ioutil.ReadFile(dir + file + ".xlsx")
+		// if err != nil {
+		// 	return dataty, file, err
+		// }
 	}
-
 	return dataty, file, nil
 }
 
@@ -301,4 +302,93 @@ func (e *Connection) UpdateDataInCategories(cityData model.Categories, field str
 		return "", err2
 	}
 	return "Data Updated Successfully", nil
+}
+
+func writeDataIntoExcel(dir, file string, data []*model.CityData) error {
+
+	f := excelize.NewFile()
+	f.SetSheetName("Sheet1", "SearchData")
+
+	f.SetCellValue("SearchData", "A1", "ID")
+	f.SetCellValue("SearchData", "B1", "Title")
+	f.SetCellValue("SearchData", "C1", "Name")
+	f.SetCellValue("SearchData", "D1", "Address")
+	f.SetCellValue("SearchData", "E1", "Latitude")
+	f.SetCellValue("SearchData", "F1", "Longitude")
+	f.SetCellValue("SearchData", "G1", "Website")
+	f.SetCellValue("SearchData", "H1", "ContactNumber")
+	f.SetCellValue("SearchData", "I1", "User")
+	f.SetCellValue("SearchData", "J1", "City")
+	f.SetCellValue("SearchData", "K1", "Country")
+	f.SetCellValue("SearchData", "L1", "PinCode")
+	f.SetCellValue("SearchData", "M1", "UpdatedBy")
+	f.SetCellValue("SearchData", "N1", "CategoriesId")
+
+	for i := range data {
+		f.SetCellValue("SearchData", "A"+fmt.Sprintf("%v", i+2), data[i].ID)
+		f.SetCellValue("SearchData", "B"+fmt.Sprintf("%v", i+2), data[i].Title)
+		f.SetCellValue("SearchData", "C"+fmt.Sprintf("%v", i+2), data[i].Name)
+		f.SetCellValue("SearchData", "D"+fmt.Sprintf("%v", i+2), data[i].Address)
+		f.SetCellValue("SearchData", "E"+fmt.Sprintf("%v", i+2), data[i].Latitude)
+		f.SetCellValue("SearchData", "F"+fmt.Sprintf("%v", i+2), data[i].Longitude)
+		f.SetCellValue("SearchData", "G"+fmt.Sprintf("%v", i+2), data[i].Website)
+		f.SetCellValue("SearchData", "H"+fmt.Sprintf("%v", i+2), data[i].ContactNumber)
+		f.SetCellValue("SearchData", "I"+fmt.Sprintf("%v", i+2), data[i].User)
+		f.SetCellValue("SearchData", "J"+fmt.Sprintf("%v", i+2), data[i].City)
+		f.SetCellValue("SearchData", "K"+fmt.Sprintf("%v", i+2), data[i].Country)
+		f.SetCellValue("SearchData", "L"+fmt.Sprintf("%v", i+2), data[i].PinCode)
+		f.SetCellValue("SearchData", "M"+fmt.Sprintf("%v", i+2), data[i].UpdatedBy)
+		f.SetCellValue("SearchData", "N"+fmt.Sprintf("%v", i+2), data[i].CategoriesId)
+	}
+
+	if err := f.SaveAs(dir + file + ".xlsx"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeDataIntoPdf(dir, file string, data []*model.CityData) error {
+	pdf := gopdf.GoPdf{}
+	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
+	pdf.AddPage()
+
+	err := pdf.AddTTFFont("wts11", "./font/Lato-Light.ttf")
+	if err != nil {
+		log.Print(err.Error())
+		fmt.Println(err)
+		return err
+	}
+
+	err = pdf.SetFont("wts11", "", 10)
+	if err != nil {
+		log.Print(err.Error())
+		return err
+	}
+	pdf.SetXY(50, 50)
+	x := 10.0
+	y := 10.0
+
+	for i := range data {
+		pdf.SetXY(50, 50+y)
+		pdf.Cell(nil, fmt.Sprintf("%v", data[i].ID))
+		pdf.Cell(nil, data[i].Title)
+		pdf.Cell(nil, data[i].Name)
+		pdf.Cell(nil, data[i].Address)
+		pdf.Cell(nil, fmt.Sprintf("%v", data[i].Latitude))
+		pdf.Cell(nil, fmt.Sprintf("%v", data[i].Longitude))
+		pdf.Cell(nil, data[i].Website)
+		pdf.Cell(nil, fmt.Sprintf("%v", data[i].ContactNumber))
+		pdf.Cell(nil, data[i].User)
+		pdf.Cell(nil, data[i].City)
+		pdf.Cell(nil, data[i].Country)
+		pdf.Cell(nil, fmt.Sprintf("%v", data[i].PinCode))
+		pdf.Cell(nil, data[i].UpdatedBy)
+		pdf.Cell(nil, fmt.Sprintf("%v", data[i].CategoriesId))
+		pdf.Next
+		x = x + 50.0
+		y = y + 50.0
+	}
+	pdf.WritePdf(dir + file + ".pdf")
+	fmt.Printf("Completed")
+	return nil
 }
