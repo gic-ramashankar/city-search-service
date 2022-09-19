@@ -384,7 +384,6 @@ func writeDataIntoPdf(dir, file string, data []*model.CityData) error {
 		pdf.Cell(nil, fmt.Sprintf("%v", data[i].PinCode))
 		pdf.Cell(nil, data[i].UpdatedBy)
 		pdf.Cell(nil, fmt.Sprintf("%v", data[i].CategoriesId))
-		pdf.Next
 		x = x + 50.0
 		y = y + 50.0
 	}
