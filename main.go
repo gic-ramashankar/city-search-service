@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"city/model"
+	"city/pojo"
 	"city/service"
 	"encoding/json"
 	"fmt"
@@ -47,7 +47,7 @@ func addData(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	segments := strings.Split(path, "/")
 	field := segments[len(segments)-1]
-	var cityData []model.CityData
+	var cityData []pojo.CityData
 
 	if err := json.NewDecoder(r.Body).Decode(&cityData); err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
@@ -107,7 +107,7 @@ func searchByCity(w http.ResponseWriter, r *http.Request) {
 	segments := strings.Split(path, "/")
 	option := segments[len(segments)-1]
 
-	var searchBoth model.SearchBoth
+	var searchBoth pojo.SearchBoth
 
 	if err := json.NewDecoder(r.Body).Decode(&searchBoth); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request")
@@ -116,10 +116,20 @@ func searchByCity(w http.ResponseWriter, r *http.Request) {
 	if searchData, fileName, err := mongoDetails.SearchData(searchBoth, option); err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
 	} else {
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Disposition", "attachment; filename="+fileName+".xlsx")
-		w.Header().Set("Content-Transfer-Encoding", "binary")
-		http.ServeContent(w, r, "Workbook.xlxs", time.Now(), bytes.NewReader(searchData))
+		if option == "Excel" {
+			fmt.Println("Return Excel")
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Content-Disposition", "attachment; filename="+fileName+".xlsx")
+			w.Header().Set("Content-Transfer-Encoding", "binary")
+			http.ServeContent(w, r, "Workbook.xlxs", time.Now(), bytes.NewReader(searchData))
+		} else if option == "Pdf" {
+			fmt.Println("Return Pdf")
+			// w.Header().Set("Content-Type", "application/pdf")
+			// w.Header().Set("Content-Disposition", "attachment; filename="+fileName+".pdf")
+			// http.ServeContent(w, r, fileName+".pdf", time.Now(), bytes.NewReader(searchData))
+			respondWithJson(w, http.StatusAccepted, map[string]string{
+				"message": "PDF Successfully Created",
+		}
 	}
 }
 
@@ -131,7 +141,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var reqBody model.Search
+	var reqBody pojo.Search
 
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request")
@@ -160,7 +170,7 @@ func updateData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var cityData model.CityData
+	var cityData pojo.CityData
 
 	if err := json.NewDecoder(r.Body).Decode(&cityData); err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
@@ -198,7 +208,7 @@ func addDataInCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var data []model.Categories
+	var data []pojo.Categories
 
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
@@ -285,7 +295,7 @@ func updateDataInCategory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var data model.Categories
+	var data pojo.Categories
 
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
@@ -320,7 +330,7 @@ func main() {
 	http.HandleFunc("/add-data/", addData)
 	http.HandleFunc("/delete-data", deleteData)
 	http.HandleFunc("/update-data/", updateData)
-	http.HandleFunc("/search-by-city-category/", searchByCity)
+	http.HandleFunc("/search-by-city-category-Excel-Pdf/", searchByCity)
 	http.HandleFunc("/search", search)
 	http.HandleFunc("/add-data-category", addDataInCategory)
 	http.HandleFunc("/delete-data-category", deleteDataInCategory)

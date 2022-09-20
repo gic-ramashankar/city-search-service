@@ -1,7 +1,7 @@
 package service
 
 import (
-	"city/model"
+	"city/pojo"
 	"context"
 	"errors"
 	"fmt"
@@ -10,7 +10,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/signintech/gopdf"
+	"github.com/unidoc/unipdf/v3/common/license"
+	"github.com/unidoc/unipdf/v3/creator"
+	"github.com/unidoc/unipdf/v3/model"
 	"github.com/xuri/excelize/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -41,12 +43,16 @@ func (e *Connection) Connect() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	err = license.SetMeteredKey("72c4ab06d023bbc8b2e186d089f9e052654afea32b75141f39c7dc1ab3b108ca")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	Collection = client.Database(e.Database).Collection(e.Collection)
 	CategoryCollection = client.Database(e.Database).Collection(e.Colllection2)
 }
 
-func (e *Connection) InsertAllData(cityData []model.CityData, field string) (int, error) {
+func (e *Connection) InsertAllData(cityData []pojo.CityData, field string) (int, error) {
 
 	data, err := e.SearchDataInCategories(field)
 	if err != nil {
@@ -89,8 +95,8 @@ func (e *Connection) DeleteData(cityData string) (string, error) {
 	return "Deleted Successfully", nil
 }
 
-func (e *Connection) SearchData(searchBoth model.SearchBoth, option string) ([]byte, string, error) {
-	var data []*model.CityData
+func (e *Connection) SearchData(searchBoth pojo.SearchBoth, option string) ([]byte, string, error) {
+	var data []*pojo.CityData
 	var cursor *mongo.Cursor
 	var err error
 	var dataty []byte
@@ -142,7 +148,7 @@ func (e *Connection) SearchData(searchBoth model.SearchBoth, option string) ([]b
 	}
 
 	for cursor.Next(ctx) {
-		var e model.CityData
+		var e pojo.CityData
 		err := cursor.Decode(&e)
 		if err != nil {
 			return dataty, file, err
@@ -168,20 +174,24 @@ func (e *Connection) SearchData(searchBoth model.SearchBoth, option string) ([]b
 
 	if option == "Pdf" {
 		log.Println("Pdf")
-		errExcel := writeDataIntoPdf(dir, file, data)
-		if errExcel != nil {
+		_, errPdf := writeDataIntoPDFTable(dir, file, data)
+		if errPdf != nil {
+			fmt.Println(errPdf)
 			return dataty, file, err
 		}
-		// dataty, err = ioutil.ReadFile(dir + file + ".xlsx")
-		// if err != nil {
-		// 	return dataty, file, err
-		// }
+		dataty, err2 := ioutil.ReadFile(dir + file + ".pdf")
+		fmt.Println(dataty)
+		fmt.Println("Data length", len(dataty))
+		if err2 != nil {
+			return dataty, file, err
+		}
 	}
+
 	return dataty, file, nil
 }
 
-func (e *Connection) SearchDataByKeyAndValue(reqBody model.Search) ([]*model.CityData, error) {
-	var data []*model.CityData
+func (e *Connection) SearchDataByKeyAndValue(reqBody pojo.Search) ([]*pojo.CityData, error) {
+	var data []*pojo.CityData
 
 	cursor, err := Collection.Find(ctx, bson.D{primitive.E{Key: reqBody.Key, Value: reqBody.Value}})
 
@@ -190,7 +200,7 @@ func (e *Connection) SearchDataByKeyAndValue(reqBody model.Search) ([]*model.Cit
 	}
 
 	for cursor.Next(ctx) {
-		var e model.CityData
+		var e pojo.CityData
 		err := cursor.Decode(&e)
 		if err != nil {
 			return data, err
@@ -205,7 +215,7 @@ func (e *Connection) SearchDataByKeyAndValue(reqBody model.Search) ([]*model.Cit
 	return data, nil
 }
 
-func (e *Connection) UpdateData(cityData model.CityData, field string) (string, error) {
+func (e *Connection) UpdateData(cityData pojo.CityData, field string) (string, error) {
 
 	id, err := primitive.ObjectIDFromHex(field)
 
@@ -225,7 +235,7 @@ func (e *Connection) UpdateData(cityData model.CityData, field string) (string, 
 	return "Data Updated Successfully", nil
 }
 
-func (e *Connection) InsertAllDataInCategories(categoryData []model.Categories) (int, error) {
+func (e *Connection) InsertAllDataInCategories(categoryData []pojo.Categories) (int, error) {
 	for i := range categoryData {
 		_, err := CategoryCollection.InsertOne(ctx, categoryData[i])
 
@@ -260,8 +270,8 @@ func (e *Connection) DeleteDataInCategories(categoryId string) (string, error) {
 	return "Deleted Successfully", nil
 }
 
-func (e *Connection) SearchDataInCategories(name string) ([]*model.Categories, error) {
-	var data []*model.Categories
+func (e *Connection) SearchDataInCategories(name string) ([]*pojo.Categories, error) {
+	var data []*pojo.Categories
 
 	cursor, err := CategoryCollection.Find(ctx, bson.D{primitive.E{Key: "category", Value: name}})
 
@@ -270,7 +280,7 @@ func (e *Connection) SearchDataInCategories(name string) ([]*model.Categories, e
 	}
 
 	for cursor.Next(ctx) {
-		var e model.Categories
+		var e pojo.Categories
 		err := cursor.Decode(&e)
 		if err != nil {
 			return data, err
@@ -284,7 +294,7 @@ func (e *Connection) SearchDataInCategories(name string) ([]*model.Categories, e
 	return data, nil
 }
 
-func (e *Connection) UpdateDataInCategories(cityData model.Categories, field string) (string, error) {
+func (e *Connection) UpdateDataInCategories(cityData pojo.Categories, field string) (string, error) {
 
 	id, err := primitive.ObjectIDFromHex(field)
 
@@ -304,7 +314,7 @@ func (e *Connection) UpdateDataInCategories(cityData model.Categories, field str
 	return "Data Updated Successfully", nil
 }
 
-func writeDataIntoExcel(dir, file string, data []*model.CityData) error {
+func writeDataIntoExcel(dir, file string, data []*pojo.CityData) error {
 
 	f := excelize.NewFile()
 	f.SetSheetName("Sheet1", "SearchData")
@@ -347,47 +357,113 @@ func writeDataIntoExcel(dir, file string, data []*model.CityData) error {
 	return nil
 }
 
-func writeDataIntoPdf(dir, file string, data []*model.CityData) error {
-	pdf := gopdf.GoPdf{}
-	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
-	pdf.AddPage()
+func writeDataIntoPDFTable(dir, file string, data []*pojo.CityData) (*creator.Creator, error) {
 
-	err := pdf.AddTTFFont("wts11", "./font/Lato-Light.ttf")
+	c := creator.New()
+	c.SetPageMargins(20, 20, 20, 20)
+
+	// Create report fonts.
+	// UniPDF supports a number of font-families, which can be accessed using model.
+	// Here we are creating two fonts, a normal one and its bold version
+	font, err := model.NewStandard14Font(model.HelveticaName)
 	if err != nil {
-		log.Print(err.Error())
-		fmt.Println(err)
+		return c, err
+	}
+
+	// Bold font
+	fontBold, err := model.NewStandard14Font(model.HelveticaBoldName)
+	if err != nil {
+		return c, err
+	}
+
+	// Generate basic usage chapter.
+	if err := basicUsage(c, font, fontBold, data); err != nil {
+		return c, err
+	}
+
+	err = c.WriteToFile(dir + file + ".pdf")
+	if err != nil {
+		return c, err
+	}
+	return c, nil
+}
+
+func basicUsage(c *creator.Creator, font, fontBold *model.PdfFont, data []*pojo.CityData) error {
+	// Create chapter.
+	ch := c.NewChapter("Search Data")
+	ch.SetMargins(0, 0, 10, 0)
+	ch.GetHeading().SetFont(font)
+	ch.GetHeading().SetFontSize(18)
+	ch.GetHeading().SetColor(creator.ColorRGBFrom8bit(72, 86, 95))
+	// You can also set inbuilt colors using creator
+	// ch.GetHeading().SetColor(creator.ColorBlack)
+
+	// Draw subchapters. Here we are only create horizontally aligned chapter.
+	// You can also vertically align and perform other optimizations as well.
+	// Check GitHub example for more.
+	contentAlignH(c, ch, font, fontBold, data)
+
+	// Draw chapter.
+	if err := c.Draw(ch); err != nil {
 		return err
 	}
 
-	err = pdf.SetFont("wts11", "", 10)
-	if err != nil {
-		log.Print(err.Error())
-		return err
-	}
-	pdf.SetXY(50, 50)
-	x := 10.0
-	y := 10.0
-
-	for i := range data {
-		pdf.SetXY(50, 50+y)
-		pdf.Cell(nil, fmt.Sprintf("%v", data[i].ID))
-		pdf.Cell(nil, data[i].Title)
-		pdf.Cell(nil, data[i].Name)
-		pdf.Cell(nil, data[i].Address)
-		pdf.Cell(nil, fmt.Sprintf("%v", data[i].Latitude))
-		pdf.Cell(nil, fmt.Sprintf("%v", data[i].Longitude))
-		pdf.Cell(nil, data[i].Website)
-		pdf.Cell(nil, fmt.Sprintf("%v", data[i].ContactNumber))
-		pdf.Cell(nil, data[i].User)
-		pdf.Cell(nil, data[i].City)
-		pdf.Cell(nil, data[i].Country)
-		pdf.Cell(nil, fmt.Sprintf("%v", data[i].PinCode))
-		pdf.Cell(nil, data[i].UpdatedBy)
-		pdf.Cell(nil, fmt.Sprintf("%v", data[i].CategoriesId))
-		x = x + 50.0
-		y = y + 50.0
-	}
-	pdf.WritePdf(dir + file + ".pdf")
-	fmt.Printf("Completed")
 	return nil
+}
+
+func contentAlignH(c *creator.Creator, ch *creator.Chapter, font, fontBold *model.PdfFont, data []*pojo.CityData) {
+	// Create subchapter.
+	// sc := ch.NewSubchapter("Content horizontal alignment")
+	// sc.GetHeading().SetFontSize(10)
+	// sc.GetHeading().SetColor(creator.ColorBlue)
+
+	// Create table.
+	table := c.NewTable(14)
+	table.SetMargins(0, 0, 15, 0)
+
+	drawCell := func(text string, font *model.PdfFont, align creator.CellHorizontalAlignment) {
+		p := c.NewStyledParagraph()
+		p.Append(text).Style.Font = font
+
+		cell := table.NewCell()
+		cell.SetBorder(creator.CellBorderSideAll, creator.CellBorderStyleSingle, 1)
+		cell.SetHorizontalAlignment(align)
+		cell.SetContent(p)
+	}
+	// Draw table header.
+	drawCell("ID", fontBold, creator.CellHorizontalAlignmentLeft)
+	drawCell("Title", fontBold, creator.CellHorizontalAlignmentCenter)
+	drawCell("Name", fontBold, creator.CellHorizontalAlignmentRight)
+	drawCell("Address", fontBold, creator.CellHorizontalAlignmentLeft)
+	drawCell("Latitude", fontBold, creator.CellHorizontalAlignmentRight)
+	drawCell("Longitude", fontBold, creator.CellHorizontalAlignmentLeft)
+	drawCell("Website", fontBold, creator.CellHorizontalAlignmentCenter)
+	drawCell("ContactNumber", fontBold, creator.CellHorizontalAlignmentRight)
+	drawCell("User", fontBold, creator.CellHorizontalAlignmentLeft)
+	drawCell("City", fontBold, creator.CellHorizontalAlignmentCenter)
+	drawCell("Country", fontBold, creator.CellHorizontalAlignmentRight)
+	drawCell("PinCode", fontBold, creator.CellHorizontalAlignmentLeft)
+	drawCell("UpdatedBy", fontBold, creator.CellHorizontalAlignmentCenter)
+	drawCell("CategoriesId", fontBold, creator.CellHorizontalAlignmentRight)
+
+	// Draw table content.
+	for i := range data {
+
+		drawCell(fmt.Sprintf("%v", data[i].ID), font, creator.CellHorizontalAlignmentLeft)
+		drawCell(data[i].Title, font, creator.CellHorizontalAlignmentCenter)
+		drawCell(data[i].Name, font, creator.CellHorizontalAlignmentCenter)
+		drawCell(data[i].Address, font, creator.CellHorizontalAlignmentCenter)
+		drawCell(fmt.Sprintf("%v", data[i].Latitude), font, creator.CellHorizontalAlignmentCenter)
+		drawCell(fmt.Sprintf("%v", data[i].Longitude), font, creator.CellHorizontalAlignmentCenter)
+		drawCell(data[i].Website, font, creator.CellHorizontalAlignmentCenter)
+		drawCell(fmt.Sprintf("%v", data[i].ContactNumber), font, creator.CellHorizontalAlignmentCenter)
+		drawCell(data[i].User, font, creator.CellHorizontalAlignmentCenter)
+		drawCell(data[i].City, font, creator.CellHorizontalAlignmentCenter)
+		drawCell(data[i].Country, font, creator.CellHorizontalAlignmentCenter)
+		drawCell(fmt.Sprintf("%v", data[i].PinCode), font, creator.CellHorizontalAlignmentCenter)
+		drawCell(data[i].UpdatedBy, font, creator.CellHorizontalAlignmentCenter)
+		drawCell(fmt.Sprintf("%v", data[i].CategoriesId), font, creator.CellHorizontalAlignmentCenter)
+	}
+
+	ch.Add(table)
 }
