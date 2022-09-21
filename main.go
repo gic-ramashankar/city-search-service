@@ -129,6 +129,7 @@ func searchByCity(w http.ResponseWriter, r *http.Request) {
 			// http.ServeContent(w, r, fileName+".pdf", time.Now(), bytes.NewReader(searchData))
 			respondWithJson(w, http.StatusAccepted, map[string]string{
 				"message": "PDF Successfully Created",
+			})
 		}
 	}
 }

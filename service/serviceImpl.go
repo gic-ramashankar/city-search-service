@@ -105,7 +105,6 @@ func (e *Connection) SearchData(searchBoth pojo.SearchBoth, option string) ([]by
 	os.MkdirAll("data/download", os.ModePerm)
 	dir := "data/download/"
 	file := "searchResult" + fmt.Sprintf("%v", time.Now().Format("3_4_5_pm"))
-	//	xlsFile, err := os.Create(dir + file + ".xls")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -180,7 +179,6 @@ func (e *Connection) SearchData(searchBoth pojo.SearchBoth, option string) ([]by
 			return dataty, file, err
 		}
 		dataty, err2 := ioutil.ReadFile(dir + file + ".pdf")
-		fmt.Println(dataty)
 		fmt.Println("Data length", len(dataty))
 		if err2 != nil {
 			return dataty, file, err
