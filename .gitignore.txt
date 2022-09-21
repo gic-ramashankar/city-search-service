@@ -10,3 +10,5 @@ uploads/
 test/
 demo/
 data/
+data/download/
+font/
